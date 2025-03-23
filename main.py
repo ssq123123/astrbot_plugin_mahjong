@@ -94,11 +94,11 @@ class MahjongManager(Star):
         return False, "未知操作"
 
     @filter.regex(r"^加\s*(\d+)")
-    async def add_player(self, event: AstrMessageEvent):
-        user_name = event.get_sender_name()  # 这里获取的是昵称
+    async def add_player(self, event: AstrMessageEvent, match):  # 添加match参数
+        user_name = event.get_sender_name()
         user_id = event.get_sender_id()
         
-        if not match:
+        if not match:  # 现在match参数已正确接收
             yield event.plain_result("格式错误，请使用「加X」格式，如：加1")
             return
 
@@ -111,6 +111,8 @@ class MahjongManager(Star):
         if not 1 <= mahjong_id <= 5:
             yield event.plain_result("局号需为1-5之间的数字")
             return
+
+        # 其余代码保持不变...
 
         # 修改调用方式，传入user_name
         success, reason = self.update_mahjong_status(mahjong_id, "add", user_id, user_name)
