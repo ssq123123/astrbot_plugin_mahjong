@@ -115,12 +115,16 @@ class MahjongManager(Star):
         user_name = event.get_sender_name()
         user_id = event.get_sender_id()  # 获取用户ID
         
+        # 打印调试信息
+        logger.debug(f"Received message: {event.message_str}")
+        
         # 尝试从消息文本中提取局号
         message_text = event.message_str
         if mahjong_id is None:
             match = re.search(r"加\s*(\d+)", message_text)
             if match:
                 mahjong_id = int(match.group(1))
+                logger.debug(f"Extracted mahjong_id: {mahjong_id}")
             else:
                 yield event.plain_result("命令格式错误，请使用“加X”的格式，其中X是局号。")
                 return
