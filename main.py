@@ -38,7 +38,7 @@ class MahjongManager(Star):
         for i in range(1, 6):
             if self.mahjong_status[i]["players"] == 0:
                 color = "灰色"
-                status_desc = "已过期"
+                status_desc = "暂时无人"
             elif self.mahjong_status[i]["players"] < self.mahjong_status[i]["max_players"] - 1:
                 color = "绿色"
                 status_desc = "可报名"
