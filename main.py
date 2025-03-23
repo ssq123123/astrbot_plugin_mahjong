@@ -111,19 +111,18 @@ class MahjongManager(Star):
         return False
 
     @filter.command("加", "add")
-    async def add_player(self, event: AstrMessageEvent, mahjong_id: int = None):
+    async def add_player(self, event: AstrMessageEvent):
         user_name = event.get_sender_name()
         user_id = event.get_sender_id()  # 获取用户ID
         
         # 尝试从消息文本中提取局号
         message_text = event.message_str
-        if mahjong_id is None:
-            match = re.search(r"加(\d+)", message_text)
-            if match:
-                mahjong_id = int(match.group(1))
-            else:
-                yield event.plain_result("命令格式错误，请使用“加X”的格式，其中X是局号。")
-                return
+        match = re.search(r"加(\d+)", message_text)
+        if match:
+            mahjong_id = int(match.group(1))
+        else:
+            yield event.plain_result("命令格式错误，请使用“加X”的格式，其中X是局号。")
+            return
 
         if 1 <= mahjong_id <= 5:
             if self.update_mahjong_status(mahjong_id, "add", user_id):
@@ -187,19 +186,18 @@ class MahjongManager(Star):
             self.context.send_message(group_id, status_msg)
 
     @filter.command("退", "退出", "remove")
-    async def remove_player(self, event: AstrMessageEvent, mahjong_id: int = None):
+    async def remove_player(self, event: AstrMessageEvent):
         user_name = event.get_sender_name()
         user_id = event.get_sender_id()  # 获取用户ID
         
         # 尝试从消息文本中提取局号
         message_text = event.message_str
-        if mahjong_id is None:
-            match = re.search(r"退(\d+)", message_text)
-            if match:
-                mahjong_id = int(match.group(1))
-            else:
-                yield event.plain_result("命令格式错误，请使用“退X”的格式，其中X是局号。")
-                return
+        match = re.search(r"退(\d+)", message_text)
+        if match:
+            mahjong_id = int(match.group(1))
+        else:
+            yield event.plain_result("命令格式错误，请使用“退X”的格式，其中X是局号。")
+            return
 
         if 1 <= mahjong_id <= 5:
             if self.update_mahjong_status(mahjong_id, "remove", user_id):
@@ -250,29 +248,19 @@ class MahjongManager(Star):
         yield event.plain_result(rules_msg)
 
     @filter.command("换")
-    async def swap_mahjong(self, event: AstrMessageEvent, command: str = None):
+    async def swap_mahjong(self, event: AstrMessageEvent):
         user_name = event.get_sender_name()
         user_id = event.get_sender_id()  # 获取用户ID
         
         # 尝试从消息文本中提取换局命令
         message_text = event.message_str
-        if command is None:
-            match = re.search(r"换(\d+)→(\d+)", message_text)
-            if match:
-                from_mahjong = int(match.group(1))
-                to_mahjong = int(match.group(2))
-            else:
-                yield event.plain_result("换局命令格式错误，请使用“换X→Y”的格式。")
-                return
+        match = re.search(r"换(\d+)→(\d+)", message_text)
+        if match:
+            from_mahjong = int(match.group(1))
+            to_mahjong = int(match.group(2))
         else:
-            # 解析换局命令，格式为“换X→Y”
-            if "→" in command:
-                from_mahjong, to_mahjong = command.split("→")
-                from_mahjong = int(from_mahjong)
-                to_mahjong = int(to_mahjong)
-            else:
-                yield event.plain_result("换局命令格式错误，请使用“换X→Y”的格式。")
-                return
+            yield event.plain_result("换局命令格式错误，请使用“换X→Y”的格式。")
+            return
 
         # 检查局号是否有效
         if 1 <= from_mahjong <= 5 and 1 <= to_mahjong <= 5:
