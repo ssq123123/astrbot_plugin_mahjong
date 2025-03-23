@@ -234,7 +234,7 @@ class MahjongManager(Star):
         if "→" in command:
             from_mahjong, to_mahjong = command.split("→")
             from_mahjong = int(from_mahjong)
-            to_mahjong = int(to_mjong)
+            to_mahjong = int(to_mahjong)
             # 检查局号是否有效
             if 1 <= from_mahjong <= 5 and 1 <= to_mahjong <= 5:
                 # 检查用户是否在原局中
