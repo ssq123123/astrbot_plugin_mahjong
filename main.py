@@ -68,9 +68,9 @@ class MahjongManager(Star):
         
         return "\n".join(status)
 
-    def update_mahjong_status(self, mahjong_id, action, user_id):
+    def update_mahjong_status(self, mahjong_id, action, user_id, user_name=None):
         players = self.mahjong_status[mahjong_id]["players"]
-        existing = any(player["id"] == user_id for player in players)
+        existing = next((p for p in players if p["id"] == user_id), None)
         
         if action == "add":
             if len(players) >= self.mahjong_status[mahjong_id]["max_players"]:
@@ -78,7 +78,11 @@ class MahjongManager(Star):
             if existing:
                 return False, "已存在"
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            players.append({"id": user_id, "join_time": current_time})
+            players.append({
+                "id": user_id,
+                "name": user_name,  # 存储昵称
+                "join_time": current_time
+            })
             return True, "成功"
         
         if action == "remove":
@@ -89,9 +93,9 @@ class MahjongManager(Star):
         
         return False, "未知操作"
 
-    @filter.regex(r"^加\s*(\d+)")
+     @filter.regex(r"^加\s*(\d+)")
     async def add_player(self, event: AstrMessageEvent):
-        user_name = event.get_sender_name()
+        user_name = event.get_sender_name()  # 这里获取的是昵称
         user_id = event.get_sender_id()
         match = re.match(r"^加\s*(\d+)", event.message_str)
         
@@ -109,7 +113,11 @@ class MahjongManager(Star):
             yield event.plain_result("局号需为1-5之间的数字")
             return
 
-        success, reason = self.update_mahjong_status(mahjong_id, "add", user_id)
+        # 修改调用方式，传入user_name
+        success, reason = self.update_mahjong_status(mahjong_id, "add", user_id, user_name)
+        
+        # 生成@消息时直接使用存储的昵称
+        mentions = " ".join([f"@{p['name']}" for p in self.mahjong_status[mahjong_id]["players"]])
         
         if not success:
             msg = {
