@@ -118,7 +118,7 @@ class MahjongManager(Star):
         # 尝试从消息文本中提取局号
         message_text = event.message_str
         if mahjong_id is None:
-            match = re.search(r"加(\d+)", message_text)
+            match = re.search(r"加\s*(\d+)", message_text)
             if match:
                 mahjong_id = int(match.group(1))
             else:
