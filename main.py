@@ -1,5 +1,4 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
-from astrbot.api.event import EventMessageType  # 尝试直接从 event 模块导入
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 import datetime
@@ -249,9 +248,9 @@ class MahjongManager(Star):
     async def create_mahjong(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         self.creating_sessions.add(user_id)
-        yield event.plain_result("请输入创建参数（块数 最大人数），例如：3 4")
+        yield event.plain_result("请输入创建参数（格式：块数 最大人数），例如：3 4")
 
-    @event_message_type(EventMessageType.ALL)
+    @filter.regex(r"^(\d+)\s+(\d+)$")
     async def handle_create_params(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         if user_id not in self.creating_sessions:
@@ -260,15 +259,15 @@ class MahjongManager(Star):
         self.creating_sessions.remove(user_id)
         params = event.message_str.split()
         
-        if len(params) != 2:
-            yield event.plain_result("参数格式错误，请发送「块数 最大人数」")
-            return
-        
         try:
             tiles = int(params[0])
             max_players = int(params[1])
         except ValueError:
             yield event.plain_result("参数必须为数字")
+            return
+        
+        if max_players < 2 or max_players > 8:
+            yield event.plain_result("人数需在2-8之间")
             return
         
         new_id = self.next_custom_id
