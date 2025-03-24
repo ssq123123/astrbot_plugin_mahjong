@@ -88,6 +88,10 @@ class MahjongManager(Star):
             status_line = f"【{mahjong_id}号局】{tiles}块🀄 {player_count}/{max_players}人（{status_text}）"
             status.append(status_line)
         
+        if self.completed_mahjong:
+            status.append("\n今日已成牌局：")
+            status.extend([f"✓ {record}" for record in self.completed_mahjong[-3:]])  # 显示最近3条
+        
         status.append("\n操作提示：")
         status.append("- 发送「加X」加入其他局（如「加1」）")
         status.append("- 发送「退」退出当前局")
@@ -152,15 +156,51 @@ class MahjongManager(Star):
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         missing = self.mahjong_status[mahjong_id]["max_players"] - len(self.mahjong_status[mahjong_id]["players"])
         
-        yield event.plain_result(
-            f"{user_name} 成功加入{mahjong_id}号局！\n"
-            f"当前{mahjong_id}号局缺{missing}人\n"
-            f"玩家加入时间：{current_time}\n\n"
-            f"{self.generate_mahjong_status()}"
-        )
+        result_msg = [
+            f"{user_name} 成功加入{mahjong_id}号局！",
+            f"当前{mahjong_id}号局缺{missing}人",
+            f"玩家加入时间：{current_time}",
+            self.generate_mahjong_status()
+        ]
+        
+        yield event.plain_result("\n\n".join(result_msg))
 
         if missing == 0:
             await self.handle_full_mahjong(mahjong_id, event)
+
+    async def handle_full_mahjong(self, mahjong_id: int, event: AstrMessageEvent):
+        # 记录完成的对局
+        record_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        record = f"{mahjong_id}号局（{self.mahjong_status[mahjong_id]['tiles']}块）于{record_time}满员"
+        self.completed_mahjong.append(record)
+        
+        # 获取所有玩家并发送通知
+        players = self.mahjong_status[mahjong_id]["players"]
+        mentions = " ".join([f"@{self.get_player_name(p['id'])}" for p in players])
+        
+        # 发送满员通知
+        notice = [
+            f"{mentions}",
+            f"🎉 {mahjong_id}号局已满员！请及时开局",
+            "该牌局已自动重置，可继续报名"
+        ]
+        self.context.send_message(event.get_group_id(), "\n".join(notice))
+        
+        # 重置该麻将局
+        self.mahjong_status[mahjong_id]["players"] = []
+        
+        # 更新群状态
+        self.push_status_to_group(event)
+
+    # ... 其他方法保持原样 ...
+
+    def push_status_to_group(self, event):
+        group_id = event.get_group_id()
+        if group_id:
+            self.context.send_message(group_id, self.generate_mahjong_status())
+
+    async def terminate(self):
+        pass
 
     @filter.regex(r"^(退|退出)\s*(\d+)?")
     async def remove_player(self, event: AstrMessageEvent):
