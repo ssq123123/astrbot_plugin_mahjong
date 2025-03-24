@@ -1,0 +1,22 @@
+{
+    "push_groups": {
+        "description": "需要推送的群聊ID列表",
+        "type": "list",
+        "hint": "输入需要推送的群聊ID，多个ID用逗号分隔",
+        "items": {
+            "type": "string"
+        }
+    },
+    "push_start_time": {
+        "description": "推送开始时间（小时）",
+        "type": "int",
+        "hint": "推送开始时间，24小时制",
+        "default": 8
+    },
+    "push_end_time": {
+        "description": "推送结束时间（小时）",
+        "type": "int",
+        "hint": "推送结束时间，24小时制",
+        "default": 22
+    }
+}
