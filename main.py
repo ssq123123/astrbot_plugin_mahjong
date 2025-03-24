@@ -250,7 +250,7 @@ class MahjongManager(Star):
         self.creating_sessions.add(user_id)
         yield event.plain_result("请输入创建参数（块数 最大人数），例如：3 4")
 
-    @filter.text
+    @event_message_type(EventMessageType.ALL)
     async def handle_create_params(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         if user_id not in self.creating_sessions:
