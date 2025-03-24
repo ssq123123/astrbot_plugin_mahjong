@@ -244,51 +244,6 @@ class MahjongManager(Star):
 🕒 用户创建的对局24小时后自动取消"""
         yield event.plain_result(rules)
 
-<<<<<<< HEAD
-        @filter.regex(r"^创建对局$")
-        async def create_mahjong(self, event: AstrMessageEvent):
-            user_id = event.get_sender_id()
-            self.creating_sessions.add(user_id)
-            yield event.plain_result("请输入创建参数（块数 最大人数），例如：3 4")
-
-        @event_message_type(EventMessageType.ALL)
-        async def handle_create_params(self, event: AstrMessageEvent):
-            user_id = event.get_sender_id()
-            if user_id not in self.creating_sessions:
-                return
-            
-            self.creating_sessions.remove(user_id)
-            params = event.message_str.split()
-            
-            if len(params) != 2:
-                yield event.plain_result("参数格式错误，请发送「块数 最大人数」")
-                return
-            
-            try:
-                tiles = int(params[0])
-                max_players = int(params[1])
-            except ValueError:
-                yield event.plain_result("参数必须为数字")
-                return
-            
-            new_id = self.next_custom_id
-            self.next_custom_id += 1
-            
-            self.mahjong_status[new_id] = {
-                "tiles": tiles,
-                "players": [],
-                "max_players": max_players,
-                "permanent": False,
-                "created_at": datetime.datetime.now()
-            }
-            
-            yield event.plain_result(
-                f"✅ 成功创建{new_id}号局！\n"
-                f"块数：{tiles}块｜最大人数：{max_players}人\n"
-                f"{self.generate_mahjong_status()}"
-            )
-            
-=======
     @filter.regex(r"^创建对局$")
     async def create_mahjong(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
@@ -332,7 +287,6 @@ class MahjongManager(Star):
             f"{self.generate_mahjong_status()}"
         )
 
->>>>>>> e17b067c49de359e2791b9c5a327acfe0ef05753
     async def handle_full_mahjong(self, mahjong_id, event):
         players = self.mahjong_status[mahjong_id]["players"]
         mentions = " ".join([f"@{self.get_player_name(p['id'])}" for p in players])
