@@ -5,6 +5,7 @@ import datetime
 import asyncio
 import re
 from astrbot.api import AstrBotConfig
+from typing import Set
 
 @register("mahjong_manager", "YourName", "麻将局管理插件", "1.0.0")
 class MahjongManager(Star):
@@ -12,24 +13,29 @@ class MahjongManager(Star):
         super().__init__(context)
         self.config = config
         self.mahjong_status = {
-            1: {"players": [], "max_players": 4, "status": "可报名"},
-            2: {"players": [], "max_players": 4, "status": "可报名"},
-            3: {"players": [], "max_players": 4, "status": "可报名"},
-            4: {"players": [], "max_players": 4, "status": "可报名"},
-            5: {"players": [], "max_players": 4, "status": "可报名"}
+            1: {"tiles": 1, "players": [], "max_players": 4, "permanent": True},
+            2: {"tiles": 2, "players": [], "max_players": 4, "permanent": True},
+            3: {"tiles": 3, "players": [], "max_players": 4, "permanent": True},
+            4: {"tiles": 4, "players": [], "max_players": 4, "permanent": True},
+            5: {"tiles": 5, "players": [], "max_players": 4, "permanent": True},
         }
+        self.next_custom_id = 6
         self.completed_mahjong = []
         self.push_groups = self.config.get("push_groups", [])
         self.push_start_time = self.config.get("push_start_time", 8)
         self.push_end_time = self.config.get("push_end_time", 22)
+        self.creating_sessions: Set[str] = set()
+        
         asyncio.create_task(self.reset_mahjong_id_daily())
         asyncio.create_task(self.hourly_status_update())
+        asyncio.create_task(self.check_expired_mahjong())
 
     async def reset_mahjong_id_daily(self):
         while True:
             now = datetime.datetime.now()
             if now.hour == 0 and now.minute == 0 and now.second == 0:
-                self.mahjong_status = {i: {"players": [], "max_players": 4, "status": "可报名"} for i in range(1,6)}
+                for i in range(1, 6):
+                    self.mahjong_status[i]["players"] = []
                 self.completed_mahjong = []
             await asyncio.sleep(1)
 
@@ -44,34 +50,55 @@ class MahjongManager(Star):
                         self.context.send_message(group_id, status_msg)
             await asyncio.sleep(1)
 
+    async def check_expired_mahjong(self):
+        while True:
+            now = datetime.datetime.now()
+            to_remove = []
+            for mahjong_id in list(self.mahjong_status.keys()):
+                info = self.mahjong_status[mahjong_id]
+                if not info.get("permanent", False):
+                    created_at = info.get("created_at")
+                    if created_at and (now - created_at).total_seconds() > 86400:
+                        to_remove.append(mahjong_id)
+            
+            for mahjong_id in to_remove:
+                del self.mahjong_status[mahjong_id]
+            
+            await asyncio.sleep(3600)
+
     def generate_mahjong_status(self):
-        status = []
-        for i in range(1, 6):
-            players = self.mahjong_status[i]["players"]
-            player_count = len(players)
-            max_players = self.mahjong_status[i]["max_players"]
-            
-            join_times = [player["join_time"] for player in players]
-            join_times_str = ", ".join(join_times) if join_times else "暂无玩家加入"
-            
-            color_status = {
-                0: ("灰色", "暂时无人"),
-                1: ("绿色", "可报名"),
-                2: ("绿色", "可报名"),
-                3: ("黄色", "即将满员"),
-                4: ("红色", "已满员")
-            }.get(player_count, ("灰色", "异常状态"))
-            
-            status.append(f"【{i}号局】{i}块🀄 {player_count}/{max_players}｜10码｜干捞1码 ({color_status[1]})")
-            status.append(f"玩家加入时间：{join_times_str}")
+        status = ["各麻将局状态："]
+        sorted_ids = sorted(self.mahjong_status.keys())
         
-        if self.completed_mahjong:
-            status.append("\n今日已成牌局：")
-            status.extend(self.completed_mahjong)
+        for mahjong_id in sorted_ids:
+            info = self.mahjong_status[mahjong_id]
+            player_count = len(info["players"])
+            max_players = info["max_players"]
+            tiles = info["tiles"]
+            
+            if player_count == 0:
+                status_text = "暂时无人"
+            elif player_count == max_players:
+                status_text = "已满员"
+            elif player_count >= max_players - 1:
+                status_text = "即将满员"
+            else:
+                status_text = "可报名"
+            
+            status_line = f"【{mahjong_id}号局】{tiles}块🀄 {player_count}/{max_players}人（{status_text}）"
+            status.append(status_line)
+        
+        status.append("\n操作提示：")
+        status.append("- 发送「加X」加入其他局（如「加1」）")
+        status.append("- 发送「退」退出当前局")
+        status.append("- 发送「创建对局」创建新对局")
         
         return "\n".join(status)
 
     def update_mahjong_status(self, mahjong_id, action, user_id):
+        if mahjong_id not in self.mahjong_status:
+            return False, "无效局号"
+        
         players = self.mahjong_status[mahjong_id]["players"]
         existing = any(player["id"] == user_id for player in players)
         
@@ -108,8 +135,8 @@ class MahjongManager(Star):
             yield event.plain_result("无效的局号")
             return
 
-        if not 1 <= mahjong_id <= 5:
-            yield event.plain_result("局号需为1-5之间的数字")
+        if mahjong_id not in self.mahjong_status:
+            yield event.plain_result("无效的局号")
             return
 
         success, reason = self.update_mahjong_status(mahjong_id, "add", user_id)
@@ -122,24 +149,15 @@ class MahjongManager(Star):
             yield event.plain_result(f"{user_name} {msg}！")
             return
 
-        status_msg = self.generate_mahjong_status()
-        current_players = len(self.mahjong_status[mahjong_id]["players"])
-        missing = self.mahjong_status[mahjong_id]["max_players"] - current_players
-        
-        # 生成@消息
-        player_ids = [p["id"] for p in self.mahjong_status[mahjong_id]["players"]]
-        mentions = " ".join([f"@{self.get_player_name(pid)}" for pid in player_ids])
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        missing = self.mahjong_status[mahjong_id]["max_players"] - len(self.mahjong_status[mahjong_id]["players"])
         
         yield event.plain_result(
             f"{user_name} 成功加入{mahjong_id}号局！\n"
-            f"{mentions} 当前{mahjong_id}号局缺{missing}人\n"
-            f"{status_msg}"
+            f"当前{mahjong_id}号局缺{missing}人\n"
+            f"玩家加入时间：{current_time}\n\n"
+            f"{self.generate_mahjong_status()}"
         )
-
-        # 推送当前组局信息到群聊
-        group_id = event.get_group_id()
-        if group_id:
-            self.context.send_message(group_id, status_msg)
 
         if missing == 0:
             await self.handle_full_mahjong(mahjong_id, event)
@@ -150,7 +168,6 @@ class MahjongManager(Star):
         user_id = event.get_sender_id()
         message = event.message_str
         
-        # 处理两种格式：退1 或 退出1
         match = re.search(r"(\d+)", message)
         if not match:
             yield event.plain_result("格式错误，请使用「退X」格式，如：退1")
@@ -162,8 +179,8 @@ class MahjongManager(Star):
             yield event.plain_result("无效的局号")
             return
 
-        if not 1 <= mahjong_id <= 5:
-            yield event.plain_result("局号需为1-5之间的数字")
+        if mahjong_id not in self.mahjong_status:
+            yield event.plain_result("无效的局号")
             return
 
         success, reason = self.update_mahjong_status(mahjong_id, "remove", user_id)
@@ -186,16 +203,17 @@ class MahjongManager(Star):
         from_id = int(match.group(1))
         to_id = int(match.group(2))
 
-        # 先退出原局
+        if from_id not in self.mahjong_status or to_id not in self.mahjong_status:
+            yield event.plain_result("无效的局号")
+            return
+
         success, _ = self.update_mahjong_status(from_id, "remove", user_id)
         if not success:
             yield event.plain_result(f"换局失败，您不在{from_id}号局中")
             return
 
-        # 加入新局
         success, reason = self.update_mahjong_status(to_id, "add", user_id)
         if not success:
-            # 回滚操作
             self.update_mahjong_status(from_id, "add", user_id)
             msg = "目标牌局已满" if reason == "满员" else "换局失败"
             yield event.plain_result(f"{user_name} {msg}，已恢复原牌局")
@@ -220,11 +238,54 @@ class MahjongManager(Star):
 🔄 换局操作：发送「换X→Y」如「换1→2」
 📊 查看状态：发送「查」或「状态」
 📖 查看规则：发送「规则」
+➕ 创建对局：发送「创建对局」按提示操作
 
-⏰ 每日0点自动重置局号
-🕒 每小时整点播报状态
-🔔 满员自动通知并清空牌局"""
+⏰ 每日0点自动重置1-5号局
+🕒 用户创建的对局24小时后自动取消"""
         yield event.plain_result(rules)
+
+    @filter.regex(r"^创建对局$")
+    async def create_mahjong(self, event: AstrMessageEvent):
+        user_id = event.get_sender_id()
+        self.creating_sessions.add(user_id)
+        yield event.plain_result("请输入创建参数（块数 最大人数），例如：3 4")
+
+    @filter.text
+    async def handle_create_params(self, event: AstrMessageEvent):
+        user_id = event.get_sender_id()
+        if user_id not in self.creating_sessions:
+            return
+        
+        self.creating_sessions.remove(user_id)
+        params = event.message_str.split()
+        
+        if len(params) != 2:
+            yield event.plain_result("参数格式错误，请发送「块数 最大人数」")
+            return
+        
+        try:
+            tiles = int(params[0])
+            max_players = int(params[1])
+        except ValueError:
+            yield event.plain_result("参数必须为数字")
+            return
+        
+        new_id = self.next_custom_id
+        self.next_custom_id += 1
+        
+        self.mahjong_status[new_id] = {
+            "tiles": tiles,
+            "players": [],
+            "max_players": max_players,
+            "permanent": False,
+            "created_at": datetime.datetime.now()
+        }
+        
+        yield event.plain_result(
+            f"✅ 成功创建{new_id}号局！\n"
+            f"块数：{tiles}块｜最大人数：{max_players}人\n"
+            f"{self.generate_mahjong_status()}"
+        )
 
     async def handle_full_mahjong(self, mahjong_id, event):
         players = self.mahjong_status[mahjong_id]["players"]
