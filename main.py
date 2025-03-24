@@ -6,6 +6,7 @@ import asyncio
 import re
 from astrbot.api import AstrBotConfig
 from typing import Set
+from astrbot.api.event.filter import event_message_type
 
 @register("mahjong_manager", "YourName", "麻将局管理插件", "1.0.0")
 class MahjongManager(Star):
